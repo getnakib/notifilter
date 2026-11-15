@@ -78,7 +78,7 @@ class BlockedFragment : Fragment(), Refreshable {
     }
 
     override fun refresh() {
-        if (!::db.isInitialized) return
+        if (!::db.isInitialized || !::adapter.isInitialized) return
         val items = db.listByStatus("BLOCKED")
         adapter.update(items)
         emptyView.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
