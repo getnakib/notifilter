@@ -83,6 +83,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         nav = findViewById(R.id.bottom_nav)
+        // Active pill colour (primary-container). There is no
+        // app:itemActiveIndicatorColor XML attribute in Material 1.12.0,
+        // so it is set in code instead.
+        nav.itemActiveIndicatorColor = android.content.res.ColorStateList.valueOf(
+            androidx.core.content.ContextCompat.getColor(this, R.color.md_primary_container)
+        )
         nav.setOnItemSelectedListener { item ->
             val fragment: Fragment = when (item.itemId) {
                 R.id.nav_blocked -> BlockedFragment()

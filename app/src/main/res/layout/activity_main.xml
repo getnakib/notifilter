@@ -100,7 +100,6 @@
         android:layout_width="match_parent"
         android:layout_height="68dp"
         android:background="@color/md_surface"
-        app:itemActiveIndicatorColor="@color/md_primary_container"
         app:itemIconTint="@color/nav_icon_tint"
         app:itemTextColor="@color/nav_text_color"
         app:labelVisibilityMode="labeled"

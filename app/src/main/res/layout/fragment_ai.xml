@@ -330,7 +330,7 @@
                         android:value="1"
                         android:valueFrom="0"
                         android:valueTo="2"
-                        app:stepSize="1" />
+                        android:stepSize="1" />
 
                     <TextView
                         android:id="@+id/strictness_value"
