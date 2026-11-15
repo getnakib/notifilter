@@ -29,9 +29,19 @@ class FilterService : NotificationListenerService() {
     private val prefs by lazy { Prefs(this) }
     private val db by lazy { NotificationDbHelper(this) }
 
+    /** Keys posted in the last 30s, to ignore snooze-expiry re-posts and
+     *  rapid updates of the same notification (prevents duplicate rows and
+     *  repeated AI calls for one notification). */
+    private val recentKeys = mutableMapOf<String, Long>()
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val pkg = sbn.packageName ?: return
         if (pkg == packageName) return // Never filter our own notifications.
+        val now = System.currentTimeMillis()
+        val lastSeen = recentKeys[sbn.key]
+        if (lastSeen != null && now - lastSeen < 30_000L) return
+        recentKeys[sbn.key] = now
+        if (recentKeys.size > 200) recentKeys.clear()
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return
 
@@ -171,7 +181,9 @@ class FilterService : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        // Nothing to do: removal by the user or the source app is not filtering.
+        // A dismissed/removed notification may legitimately re-appear later
+        // with the same key, so forget it here.
+        recentKeys.remove(sbn.key)
     }
 
     private fun matchesAny(text: String, keywords: Set<String>): Boolean {
