@@ -69,7 +69,7 @@ class InboxFragment : Fragment(), Refreshable {
     }
 
     override fun refresh() {
-        if (!::db.isInitialized) return
+        if (!::db.isInitialized || !::adapter.isInitialized) return
         var items: List<Record> = db.listByStatus("SHOWN")
         items = when (filter) {
             "otp" -> items.filter { it.isOtp }
