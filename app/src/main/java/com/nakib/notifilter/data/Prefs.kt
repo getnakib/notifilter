@@ -60,6 +60,28 @@ class Prefs(context: Context) {
         ) ?: ""
         set(v) = sp.edit().putString("otp_regex", v).apply()
 
+    /** OTP fast-path on/off. Default true = OTP is matched by regex first and
+     *  shown instantly, never sent to AI. Bound to the "OTP first" switch in
+     *  Rules and the "Instant OTP" switch in AI settings. */
+    var otpEnabled: Boolean
+        get() = sp.getBoolean("otp_enabled", true)
+        set(v) = sp.edit().putBoolean("otp_enabled", v).apply()
+
+    /** Master switch for image/graphic analysis (Rules card). Default true. */
+    var imageAnalysisEnabled: Boolean
+        get() = sp.getBoolean("image_analysis_enabled", true)
+        set(v) = sp.edit().putBoolean("image_analysis_enabled", v).apply()
+
+    /** Behaviour: blocked notifications never ring. Default true. */
+    var silentBlocked: Boolean
+        get() = sp.getBoolean("silent_blocked", true)
+        set(v) = sp.edit().putBoolean("silent_blocked", v).apply()
+
+    /** Behaviour: one daily recap notification at 9 pm. Default false. */
+    var dailySummary: Boolean
+        get() = sp.getBoolean("daily_summary", false)
+        set(v) = sp.edit().putBoolean("daily_summary", v).apply()
+
     var blockKeywords: MutableSet<String>
         get() = (sp.getStringSet("block_keywords", DEFAULT_BLOCK) ?: DEFAULT_BLOCK)
             .toMutableSet()

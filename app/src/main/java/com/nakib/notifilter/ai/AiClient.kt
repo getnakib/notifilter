@@ -43,22 +43,38 @@ object AiClient {
             "Notification title: \"$title\". Notification text: \"$text\"."
     }
 
-    /** Classify with the user's configured provider. Null = no key / failure. */
+    /** Classify with the user's configured provider. Null = no key / failure.
+     *  When an image is attached, the vision model (AI settings) is used
+     *  instead of the text model; "auto" means the selected provider's model. */
     fun classifySync(
         prefs: Prefs,
         title: String,
         text: String,
         imageBase64: String? = null
     ): Verdict? {
+        val visionModel = if (imageBase64 != null) resolveVisionModel(prefs) else null
         return when (prefs.aiProvider) {
             "google" -> {
                 if (prefs.googleKey.isBlank()) return null
-                classifyGemini(prefs, title, text, imageBase64)
+                classifyGemini(prefs, title, text, imageBase64, visionModel)
             }
             else -> {
                 if (prefs.openRouterKey.isBlank()) return null
-                classifyOpenRouter(prefs, title, text, imageBase64)
+                classifyOpenRouter(prefs, title, text, imageBase64, visionModel)
             }
+        }
+    }
+
+    /** Resolve the vision model for the current provider, or null to use the
+     *  provider's text model. "auto" (or blank) = provider model. */
+    private fun resolveVisionModel(prefs: Prefs): String? {
+        val v = prefs.visionModel.trim()
+        if (v.isBlank() || v == "auto") return null
+        return when (prefs.aiProvider) {
+            // Gemini needs a bare model name: "google/gemini-2.0-flash" -> "gemini-2.0-flash".
+            "google" -> v.substringAfterLast("/")
+            // OpenRouter needs a provider/model id.
+            else -> if (v.contains("/")) v else null
         }
     }
 
@@ -66,7 +82,8 @@ object AiClient {
         prefs: Prefs,
         title: String,
         text: String,
-        imageBase64: String?
+        imageBase64: String?,
+        modelOverride: String? = null
     ): Verdict? {
         return try {
             val userContent = JSONArray()
@@ -80,7 +97,7 @@ object AiClient {
                 )
             }
             val body = JSONObject().apply {
-                put("model", prefs.openRouterModel)
+                put("model", modelOverride ?: prefs.openRouterModel)
                 put("messages", JSONArray().apply {
                     put(JSONObject().put("role", "user").put("content", userContent))
                 })
@@ -111,7 +128,8 @@ object AiClient {
         prefs: Prefs,
         title: String,
         text: String,
-        imageBase64: String?
+        imageBase64: String?,
+        modelOverride: String? = null
     ): Verdict? {
         return try {
             val parts = JSONArray()
@@ -129,8 +147,9 @@ object AiClient {
                     put(JSONObject().put("parts", parts))
                 })
             }
+            val model = modelOverride ?: prefs.geminiModel
             val url =
-                "https://generativelanguage.googleapis.com/v1beta/models/${prefs.geminiModel}:generateContent?key=${prefs.googleKey}"
+                "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${prefs.googleKey}"
             val request = Request.Builder()
                 .url(url)
                 .post(body.toString().toRequestBody(JSON))

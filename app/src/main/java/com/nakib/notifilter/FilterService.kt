@@ -34,6 +34,26 @@ class FilterService : NotificationListenerService() {
      *  repeated AI calls for one notification). */
     private val recentKeys = mutableMapOf<String, Long>()
 
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        instance = this
+    }
+
+    override fun onListenerDisconnected() {
+        if (instance === this) instance = null
+        super.onListenerDisconnected()
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val pkg = sbn.packageName ?: return
         if (pkg == packageName) return // Never filter our own notifications.
@@ -64,28 +84,30 @@ class FilterService : NotificationListenerService() {
 
         // Paused: record and leave everything untouched.
         if (prefs.paused) {
-            db.insert(Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage))
+            db.insert(Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage, key = sbn.key))
             return
         }
 
         val fullText = "$title $body"
 
-        // 1. OTP first — never cancelled, never held.
-        val otp = OtpDetector.extractOtp(fullText, prefs.otpRegex)
-        if (otp != null) {
-            db.insert(
-                Record(
-                    pkg = pkg, appName = appName, title = title, body = body,
-                    otp = otp, isOtp = true, hasImage = hasImage
+        // 1. OTP first — never cancelled, never held (when OTP is enabled).
+        if (prefs.otpEnabled) {
+            val otp = OtpDetector.extractOtp(fullText, prefs.otpRegex)
+            if (otp != null) {
+                db.insert(
+                    Record(
+                        pkg = pkg, appName = appName, title = title, body = body,
+                        otp = otp, isOtp = true, hasImage = hasImage, key = sbn.key
+                    )
                 )
-            )
-            return
+                return
+            }
         }
 
         // 2. Always-allow list.
         if (matchesAny(fullText, prefs.allowList) || matchesAny(appName, prefs.allowList)) {
             db.insert(
-                Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage)
+                Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage, key = sbn.key)
             )
             return
         }
@@ -97,7 +119,7 @@ class FilterService : NotificationListenerService() {
             db.insert(
                 Record(
                     pkg = pkg, appName = appName, title = title, body = body,
-                    status = "BLOCKED", reason = "Keyword: $hitKeyword", hasImage = hasImage
+                    status = "BLOCKED", reason = "Keyword: $hitKeyword", hasImage = hasImage, key = sbn.key
                 )
             )
             return
@@ -106,7 +128,7 @@ class FilterService : NotificationListenerService() {
         // 4. Regex mode: no AI at all — everything else passes through.
         if (prefs.mode == "regex") {
             db.insert(
-                Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage)
+                Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage, key = sbn.key)
             )
             return
         }
@@ -124,12 +146,12 @@ class FilterService : NotificationListenerService() {
                 db.insert(
                     Record(
                         pkg = pkg, appName = appName, title = title, body = body,
-                        status = "BLOCKED", reason = "Keyword: $promoHit", hasImage = hasImage
+                        status = "BLOCKED", reason = "Keyword: $promoHit", hasImage = hasImage, key = sbn.key
                     )
                 )
             } else {
                 db.insert(
-                    Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage)
+                    Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage, key = sbn.key)
                 )
             }
             return
@@ -141,7 +163,7 @@ class FilterService : NotificationListenerService() {
         } catch (_: Exception) {
             // Snooze unavailable on this device: decide without holding.
         }
-        val imageBase64 = if (hasImage && (prefs.imageOcr || prefs.imagePromoBlock)) {
+        val imageBase64 = if (hasImage && prefs.imageAnalysisEnabled && (prefs.imageOcr || prefs.imagePromoBlock)) {
             ImageAnalyzer.toBase64Jpeg(picture)
         } else {
             null
@@ -151,7 +173,7 @@ class FilterService : NotificationListenerService() {
             if (verdict == null) {
                 // AI failed: leave the notification alone, record as shown.
                 db.insert(
-                    Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage)
+                    Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage, key = sbn.key)
                 )
                 return@Thread
             }
@@ -165,7 +187,7 @@ class FilterService : NotificationListenerService() {
                         pkg = pkg, appName = appName, title = title, body = body,
                         status = "BLOCKED",
                         reason = "AI ${verdict.score}% — ${verdict.reason}",
-                        hasImage = hasImage
+                        hasImage = hasImage, key = sbn.key
                     )
                 )
             } else {
@@ -173,7 +195,7 @@ class FilterService : NotificationListenerService() {
                     Record(
                         pkg = pkg, appName = appName, title = title, body = body,
                         reason = "AI ${verdict.score}%",
-                        hasImage = hasImage
+                        hasImage = hasImage, key = sbn.key
                     )
                 )
             }
@@ -197,6 +219,26 @@ class FilterService : NotificationListenerService() {
     }
 
     companion object {
+        /** The running listener instance, so the Inbox can cancel (Mark as
+         *  spam / Dismiss) the original notification by key. Null when the
+         *  listener is not bound. */
+        @Volatile
+        private var instance: FilterService? = null
+
+        /** Cancel the original notification with this key. Returns true if
+         *  the listener was running and the cancel was issued. Never posts
+         *  anything as NotiFilter. */
+        fun cancelByKey(key: String): Boolean {
+            if (key.isBlank()) return false
+            return try {
+                val svc = instance ?: return false
+                svc.cancelNotification(key)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
         val PROMO_WORDS = setOf(
             "win prize", "jackpot", "90% off", "free recharge",
             "claim now", "congratulations you won", "loan offer", "limited offer",

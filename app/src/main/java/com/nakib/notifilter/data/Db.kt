@@ -5,7 +5,9 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-/** One stored notification. status is SHOWN or BLOCKED. */
+/** One stored notification. status is SHOWN or BLOCKED. `key` is the
+ *  StatusBarNotification key, used to cancel / dismiss the original
+ *  notification from the Inbox (Mark as spam / Dismiss). */
 data class Record(
     val id: Long = 0,
     val pkg: String,
@@ -18,7 +20,8 @@ data class Record(
     val reason: String? = null,
     val isOtp: Boolean = false,
     val hasImage: Boolean = false,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val key: String = ""
 )
 
 data class AppStat(
@@ -33,7 +36,7 @@ data class AppStat(
 }
 
 class NotificationDbHelper(context: Context) :
-    SQLiteOpenHelper(context, "notifilter.db", null, 1) {
+    SQLiteOpenHelper(context, "notifilter.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -49,7 +52,8 @@ class NotificationDbHelper(context: Context) :
                 reason TEXT,
                 is_otp INTEGER NOT NULL DEFAULT 0,
                 has_image INTEGER NOT NULL DEFAULT 0,
-                is_read INTEGER NOT NULL DEFAULT 0
+                is_read INTEGER NOT NULL DEFAULT 0,
+                key TEXT NOT NULL DEFAULT ''
             )"""
         )
         db.execSQL("CREATE INDEX idx_status ON records(status)")
@@ -57,7 +61,11 @@ class NotificationDbHelper(context: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // v1: nothing to migrate.
+        // v2: store the StatusBarNotification key so the Inbox can cancel
+        // (Mark as spam / Dismiss) the original notification.
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE records ADD COLUMN key TEXT NOT NULL DEFAULT ''")
+        }
     }
 
     fun insert(record: Record): Long {
@@ -73,8 +81,18 @@ class NotificationDbHelper(context: Context) :
             put("is_otp", if (record.isOtp) 1 else 0)
             put("has_image", if (record.hasImage) 1 else 0)
             put("is_read", if (record.isRead) 1 else 0)
+            put("key", record.key)
         }
         return writableDatabase.insert("records", null, values)
+    }
+
+    /** Move a shown record to Blocked (Mark as spam). Counts as spam. */
+    fun markSpam(id: Long, reason: String = "Marked as spam") {
+        val values = ContentValues().apply {
+            put("status", "BLOCKED")
+            put("reason", reason)
+        }
+        writableDatabase.update("records", values, "id = ?", arrayOf(id.toString()))
     }
 
     fun listByStatus(status: String): List<Record> {
@@ -135,6 +153,8 @@ class NotificationDbHelper(context: Context) :
     private fun fromCursor(c: android.database.Cursor): Record {
         fun s(name: String): String = c.getString(c.getColumnIndexOrThrow(name)) ?: ""
         fun sOrNull(name: String): String? = c.getString(c.getColumnIndexOrThrow(name))
+        // The key column was added in v2; tolerate its absence defensively.
+        val keyIdx = c.getColumnIndex("key")
         return Record(
             id = c.getLong(c.getColumnIndexOrThrow("id")),
             pkg = s("pkg"),
@@ -147,7 +167,8 @@ class NotificationDbHelper(context: Context) :
             reason = sOrNull("reason"),
             isOtp = c.getInt(c.getColumnIndexOrThrow("is_otp")) == 1,
             hasImage = c.getInt(c.getColumnIndexOrThrow("has_image")) == 1,
-            isRead = c.getInt(c.getColumnIndexOrThrow("is_read")) == 1
+            isRead = c.getInt(c.getColumnIndexOrThrow("is_read")) == 1,
+            key = if (keyIdx >= 0) c.getString(keyIdx).orEmpty() else ""
         )
     }
 }

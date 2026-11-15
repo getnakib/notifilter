@@ -40,6 +40,10 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name=".summary.SummaryReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

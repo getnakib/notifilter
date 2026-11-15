@@ -1,12 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Material 3 / Google-app palette, dark. Tokens copied from the approved preview. -->
 <resources>
     <color name="md_primary">#A8C7FA</color>
+    <color name="md_on_primary">#062E6F</color>
     <color name="md_primary_container">#0842A0</color>
-    <color name="md_surface">#131314</color>
-    <color name="md_card">#1E1F20</color>
-    <color name="md_text">#E3E3E3</color>
-    <color name="md_muted">#A8A8A8</color>
-    <color name="md_outline">#8E918F</color>
-    <color name="md_tag_bg">#2A2B2C</color>
+    <color name="md_on_primary_container">#D3E3FD</color>
+    <color name="md_secondary_container">#004B70</color>
+    <color name="md_on_secondary_container">#C2E7FF</color>
+    <color name="md_tertiary_container">#0F5223</color>
+    <color name="md_on_tertiary_container">#C4EED0</color>
+    <!-- Surface = cards / app bar / nav bar. Background = page behind them. -->
+    <color name="md_surface">#282A2C</color>
+    <color name="md_bg">#131314</color>
+    <color name="md_surface_dim">#1E1F20</color>
+    <color name="md_container">#1E1F20</color>
+    <color name="md_container_high">#333537</color>
+    <color name="md_on_surface">#E3E3E3</color>
+    <color name="md_on_variant">#C4C7C5</color>
+    <color name="md_outline">#444746</color>
+    <color name="md_outline_strong">#8E918F</color>
     <color name="md_error">#F2B8B5</color>
+    <color name="md_error_container">#601410</color>
+    <color name="md_on_error_container">#F9DEDC</color>
+    <color name="md_ok">#7DDB92</color>
+    <!-- Legacy aliases kept so older layouts keep compiling. -->
+    <color name="md_card">#282A2C</color>
+    <color name="md_text">#E3E3E3</color>
+    <color name="md_muted">#C4C7C5</color>
+    <color name="md_tag_bg">#1E1F20</color>
 </resources>
