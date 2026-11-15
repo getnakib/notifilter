@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_inbox"
+        android:icon="@drawable/ic_inbox"
+        android:title="@string/inbox" />
+    <item
+        android:id="@+id/nav_blocked"
+        android:icon="@drawable/ic_block"
+        android:title="@string/blocked" />
+    <item
+        android:id="@+id/nav_rules"
+        android:icon="@drawable/ic_tune"
+        android:title="@string/rules" />
+    <item
+        android:id="@+id/nav_ai"
+        android:icon="@drawable/ic_ai"
+        android:title="@string/ai" />
+</menu>
