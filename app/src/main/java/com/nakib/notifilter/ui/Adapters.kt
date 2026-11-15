@@ -1,9 +1,6 @@
 package com.nakib.notifilter.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.drawable.Drawable
 import android.text.SpannableString
@@ -18,7 +15,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.nakib.notifilter.R
@@ -27,7 +23,11 @@ import com.nakib.notifilter.data.Record
 import java.util.Date
 
 /** Friendly app name. The service stores the label, but older rows (or a
- *  label lookup failure) can hold the package name — resolve it here. */
+ *  label lookup failure) can hold the package name — resolve it here.
+ *  Needs QUERY_ALL_PACKAGES (declared in the manifest) on Android 11+,
+ *  otherwise PackageManager cannot see other apps and throws. Last resort:
+ *  the last package segment, capitalised ("Messaging"), never the raw
+ *  package name. */
 fun friendlyAppName(context: Context, record: Record): String {
     val stored = record.appName
     val looksLikePackage = stored.contains(".") && stored == stored.lowercase() && !stored.contains(" ")
@@ -35,10 +35,19 @@ fun friendlyAppName(context: Context, record: Record): String {
     return try {
         val pm = context.packageManager
         val info = pm.getApplicationInfo(record.pkg, 0)
-        pm.getApplicationLabel(info).toString()
+        val label = pm.getApplicationLabel(info).toString().trim()
+        if (label.isNotBlank() && label != record.pkg) label else lastSegmentName(record.pkg)
     } catch (_: Exception) {
-        stored.ifBlank { record.pkg }
+        lastSegmentName(record.pkg)
     }
+}
+
+/** Last package segment, capitalised — e.g. "com.google.android.apps.messaging"
+ *  -> "Messaging". Only a last-resort display name when the real label
+ *  cannot be resolved; never show the full package name. */
+fun lastSegmentName(pkg: String): String {
+    val seg = pkg.substringAfterLast(".").ifBlank { pkg }
+    return seg.replaceFirstChar { it.uppercaseChar() }
 }
 
 /** Load the originating app's real icon into [icon]; on failure show the
@@ -47,7 +56,7 @@ fun bindAppIcon(context: Context, pkg: String, appName: String, icon: ImageView,
     var drawable: Drawable? = null
     try {
         drawable = context.packageManager.getApplicationIcon(pkg)
-    } catch (_: PackageManager.NameNotFoundException) {
+    } catch (_: Exception) {
         drawable = null
     }
     if (drawable != null) {
@@ -77,8 +86,8 @@ fun styleTag(context: Context, tag: TextView, kind: TagKind) {
     tag.compoundDrawableTintList = ColorStateList.valueOf(ContextCompat.getColor(context, dot))
 }
 
-/** Shown notifications. OTP rows have a Copy button. Each card has a menu
- *  with Copy code (OTP), Mark as spam, Dismiss. */
+/** Shown notifications. OTP rows show the code as one unbroken string.
+ *  Each card has a menu with Mark as spam, Dismiss. */
 class NotificationAdapter(
     private var items: List<Record>,
     private val onMarkSpam: (Record) -> Unit = {},
@@ -95,7 +104,6 @@ class NotificationAdapter(
         val tag: TextView = view.findViewById(R.id.tag)
         val otpRow: View = view.findViewById(R.id.otp_row)
         val otpCode: TextView = view.findViewById(R.id.otp_code)
-        val copyButton: ImageButton = view.findViewById(R.id.copy_button)
         val mediaRow: View = view.findViewById(R.id.media_row)
         val menuButton: ImageButton = view.findViewById(R.id.card_menu_button)
     }
@@ -129,30 +137,18 @@ class NotificationAdapter(
 
         if (item.otp != null) {
             holder.otpRow.visibility = View.VISIBLE
-            holder.otpCode.text = item.otp.chunked(3).joinToString(" ")
-            holder.copyButton.setOnClickListener {
-                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("OTP", item.otp))
-                Toast.makeText(context, "OTP copied", Toast.LENGTH_SHORT).show()
-            }
+            // Show the code as one unbroken string — never chunk it.
+            holder.otpCode.text = item.otp
         } else {
             holder.otpRow.visibility = View.GONE
         }
 
         holder.menuButton.setOnClickListener { anchor ->
             val popup = PopupMenu(context, anchor)
-            if (item.otp != null) {
-                popup.menu.add(Menu.NONE, 1, Menu.NONE, context.getString(R.string.copy_code))
-            }
             popup.menu.add(Menu.NONE, 2, Menu.NONE, context.getString(R.string.mark_as_spam))
             popup.menu.add(Menu.NONE, 3, Menu.NONE, context.getString(R.string.dismiss))
             popup.setOnMenuItemClickListener { menuItem ->
                 when (menuItem.itemId) {
-                    1 -> {
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("OTP", item.otp))
-                        Toast.makeText(context, "OTP copied", Toast.LENGTH_SHORT).show()
-                    }
                     2 -> onMarkSpam(item)
                     3 -> onDismiss(item)
                 }

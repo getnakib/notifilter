@@ -16,7 +16,7 @@ import com.nakib.notifilter.data.Record
  * Pass-through notification filter.
  *
  * - OTP: never cancelled or held. The original notification shows instantly;
- *   a copy is saved in the Inbox with a Copy button.
+ *   a copy is saved in the Inbox.
  * - Spam: cancelled with cancelNotification() and stored in Blocked only.
  *   No replacement notification is ever posted from NotiFilter.
  * - Important / not spam: left completely untouched, so it appears exactly
@@ -73,9 +73,11 @@ class FilterService : NotificationListenerService() {
 
         val appName = try {
             val info = packageManager.getApplicationInfo(pkg, 0)
-            packageManager.getApplicationLabel(info).toString()
-        } catch (_: PackageManager.NameNotFoundException) {
-            pkg
+            val label = packageManager.getApplicationLabel(info).toString().trim()
+            if (label.isNotBlank() && label != pkg) label
+            else pkg.substringAfterLast(".").replaceFirstChar { it.uppercaseChar() }
+        } catch (_: Exception) {
+            pkg.substringAfterLast(".").replaceFirstChar { it.uppercaseChar() }
         }
 
         @Suppress("DEPRECATION")
