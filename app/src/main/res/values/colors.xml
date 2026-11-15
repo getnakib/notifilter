@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="md_primary">#0B57D0</color>
+    <color name="md_primary_container">#D3E3FD</color>
+    <color name="md_surface">#F0F4F9</color>
+    <color name="md_card">#FFFFFF</color>
+    <color name="md_text">#1B1B1F</color>
+    <color name="md_muted">#44474E</color>
+    <color name="md_outline">#747775</color>
+    <color name="md_tag_bg">#E8EDEF</color>
+    <color name="md_error">#B3261E</color>
+</resources>
