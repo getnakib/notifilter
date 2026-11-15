@@ -106,13 +106,15 @@ class AiFragment : Fragment() {
             testResult.text = "Testing…"
             Thread {
                 val ok = AiClient.testSync(provider, key, model)
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     testResult.text = if (ok) "Connected" else "Failed — check key and model"
-                    Toast.makeText(
-                        requireContext(),
-                        if (ok) "Connected" else "Connection failed",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    context?.let {
+                        Toast.makeText(
+                            it,
+                            if (ok) "Connected" else "Connection failed",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }.start()
         }
