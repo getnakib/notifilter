@@ -16,7 +16,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      # No setup-android step: the obsolete `tools` package it installs no
+      # longer exists, so that action fails. The ubuntu runner already has
+      # the Android SDK preinstalled (ANDROID_HOME is set by the runner).
       - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: "8.9"
