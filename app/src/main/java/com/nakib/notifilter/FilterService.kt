@@ -34,6 +34,11 @@ class FilterService : NotificationListenerService() {
      *  repeated AI calls for one notification). */
     private val recentKeys = mutableMapOf<String, Long>()
 
+    /** Keys a rule has snoozed, mapped to when they may be judged again
+     *  (snooze expiry + 1 min buffer). Without this, a re-appearing snoozed
+     *  notification would match the same rule and be snoozed again forever. */
+    private val snoozedKeys = mutableMapOf<String, Long>()
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -47,6 +52,7 @@ class FilterService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
+        prefs.listenerConnectedAt = System.currentTimeMillis()
     }
 
     override fun onListenerDisconnected() {
@@ -70,6 +76,10 @@ class FilterService : NotificationListenerService() {
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty()
         val body = if (bigText.isNotBlank()) bigText else text
         if (title.isBlank() && body.isBlank()) return
+
+        // A real notification reached the listener — record it for the
+        // Inbox status row ("last notification 07:02").
+        prefs.lastNotificationSeen = now
 
         val appName = try {
             val info = packageManager.getApplicationInfo(pkg, 0)
@@ -106,7 +116,54 @@ class FilterService : NotificationListenerService() {
             }
         }
 
-        // 2. Always-allow list.
+        // 2. Matching enabled rule (FilterBox way: app + keyword + time
+        //    window). OTP already won above — a rule never blocks an OTP.
+        //    A notification a rule just snoozed is not judged again until
+        //    its snooze has expired, or it would be snoozed forever.
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val alreadySnoozed = snoozedKeys[sbn.key]?.let { it > now } == true
+        val rule = if (alreadySnoozed) null else db.listRules()
+            .firstOrNull { it.matches(pkg, title, body, hour) }
+        if (rule != null) {
+            if (rule.isSnooze) {
+                val durationMs = rule.snoozeDurationMs
+                var snoozed = false
+                try {
+                    snoozeNotification(sbn.key, durationMs)
+                    snoozed = true
+                } catch (_: Exception) {
+                    // Snooze unavailable on this device: leave it shown.
+                }
+                if (snoozed) {
+                    snoozedKeys[sbn.key] = now + durationMs + 60_000L
+                    if (snoozedKeys.size > 200) {
+                        snoozedKeys.entries.removeIf { it.value <= now }
+                    }
+                }
+                db.insert(
+                    Record(
+                        pkg = pkg, appName = appName, title = title, body = body,
+                        status = "SHOWN",
+                        reason = if (snoozed) "Rule: ${rule.name} · Snoozed ${rule.snoozeLabel()}"
+                        else "Rule: ${rule.name} · Snooze failed",
+                        hasImage = hasImage, key = sbn.key
+                    )
+                )
+                return
+            }
+            // Dismiss: cancel the original, store in Blocked only.
+            cancelNotification(sbn.key)
+            db.insert(
+                Record(
+                    pkg = pkg, appName = appName, title = title, body = body,
+                    status = "BLOCKED", reason = "Rule: ${rule.name}",
+                    hasImage = hasImage, key = sbn.key
+                )
+            )
+            return
+        }
+
+        // 3. Always-allow list.
         if (matchesAny(fullText, prefs.allowList) || matchesAny(appName, prefs.allowList)) {
             db.insert(
                 Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage, key = sbn.key)
@@ -114,7 +171,7 @@ class FilterService : NotificationListenerService() {
             return
         }
 
-        // 3. Block keywords.
+        // 4. Block keywords.
         val hitKeyword = firstMatch(fullText, prefs.blockKeywords)
         if (hitKeyword != null) {
             cancelNotification(sbn.key)
@@ -127,7 +184,7 @@ class FilterService : NotificationListenerService() {
             return
         }
 
-        // 4. Regex mode: no AI at all — everything else passes through.
+        // 5. Regex mode: no AI at all — everything else passes through.
         if (prefs.mode == "regex") {
             db.insert(
                 Record(pkg = pkg, appName = appName, title = title, body = body, hasImage = hasImage, key = sbn.key)
@@ -135,7 +192,7 @@ class FilterService : NotificationListenerService() {
             return
         }
 
-        // 5. AI mode. No key configured -> keyword fallback on promo words.
+        // 6. AI mode. No key configured -> keyword fallback on promo words.
         val hasKey = if (prefs.aiProvider == "google") {
             prefs.googleKey.isNotBlank()
         } else {
@@ -227,6 +284,10 @@ class FilterService : NotificationListenerService() {
         @Volatile
         private var instance: FilterService? = null
 
+        /** True while the listener is bound (notification access granted and
+         *  the service connected). Used by the Inbox status row. */
+        fun isConnected(): Boolean = instance != null
+
         /** Cancel the original notification with this key. Returns true if
          *  the listener was running and the cancel was issued. Never posts
          *  anything as NotiFilter. */
@@ -235,6 +296,19 @@ class FilterService : NotificationListenerService() {
             return try {
                 val svc = instance ?: return false
                 svc.cancelNotification(key)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        /** Snooze the original notification with this key. Returns true if
+         *  the listener was running and the snooze was issued. */
+        fun snoozeByKey(key: String, durationMs: Long): Boolean {
+            if (key.isBlank()) return false
+            return try {
+                val svc = instance ?: return false
+                svc.snoozeNotification(key, durationMs)
                 true
             } catch (_: Exception) {
                 false

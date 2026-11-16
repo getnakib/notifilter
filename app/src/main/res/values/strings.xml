@@ -138,4 +138,37 @@
     <string name="permission_notify_body">Only for the app\u2019s own internal alerts. Not needed to filter.</string>
     <string name="permission_notify_button">Allow notifications</string>
     <string name="continue_button">Continue</string>
+    <!-- My rules (FilterBox way) -->
+    <string name="my_rules">My rules</string>
+    <string name="my_rules_hint">A rule picks the apps it applies to — like FilterBox.</string>
+    <string name="add_rule">Add rule</string>
+    <string name="no_rules_hint">No rules yet. Add one to filter a specific app.</string>
+    <string name="new_rule">New rule</string>
+    <string name="edit_rule">Edit rule</string>
+    <string name="rule_name">Rule name</string>
+    <string name="from_apps">From apps</string>
+    <string name="no_apps_selected">No apps selected</string>
+    <plurals name="apps_selected">
+        <item quantity="one">%1$d app selected</item>
+        <item quantity="other">%1$d apps selected</item>
+    </plurals>
+    <string name="search_apps">Search apps</string>
+    <string name="pick_at_least_one_app">Pick at least one app</string>
+    <string name="rule_keywords">Keywords (optional)</string>
+    <string name="rule_keywords_hint">No keywords = the rule matches the whole app.</string>
+    <string name="rule_action">Action</string>
+    <string name="action_dismiss">Dismiss — cancel it and keep it in Blocked</string>
+    <string name="action_snooze">Snooze — hide it for a while, then it comes back</string>
+    <string name="snooze_15">15 minutes</string>
+    <string name="snooze_60">1 hour</string>
+    <string name="snooze_until">Until dismissed</string>
+    <string name="time_window">Only at certain hours</string>
+    <string name="time_window_hint">Off = the rule applies all day. Overnight works, e.g. 22:00–07:00.</string>
+    <string name="start_hour">From hour</string>
+    <string name="end_hour">To hour</string>
+    <string name="rule_enabled">Rule enabled</string>
+    <string name="save_rule">Save rule</string>
+    <string name="delete_rule">Delete rule</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="app_icon">App icon</string>
 </resources>

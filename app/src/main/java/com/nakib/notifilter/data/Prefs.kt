@@ -103,6 +103,19 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("image_qr_check", false)
         set(v) = sp.edit().putBoolean("image_qr_check", v).apply()
 
+    /** When the listener last saw a notification (millis, 0 = never). Set by
+     *  FilterService; shown in the Inbox status row so Rani can tell at a
+     *  glance whether notifications are reaching the app. */
+    var lastNotificationSeen: Long
+        get() = sp.getLong("last_notification_seen", 0L)
+        set(v) = sp.edit().putLong("last_notification_seen", v).apply()
+
+    /** When the listener last connected (millis, 0 = never). Set by
+     *  FilterService.onListenerConnected(). */
+    var listenerConnectedAt: Long
+        get() = sp.getLong("listener_connected_at", 0L)
+        set(v) = sp.edit().putLong("listener_connected_at", v).apply()
+
     companion object {
         val DEFAULT_BLOCK = setOf(
             "win prize", "jackpot", "90% off", "free recharge",

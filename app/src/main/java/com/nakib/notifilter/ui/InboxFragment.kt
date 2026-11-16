@@ -1,8 +1,11 @@
 package com.nakib.notifilter.ui
 
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
+import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +13,8 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -20,6 +25,7 @@ import com.nakib.notifilter.R
 import com.nakib.notifilter.data.NotificationDbHelper
 import com.nakib.notifilter.data.Prefs
 import com.nakib.notifilter.data.Record
+import java.util.Date
 
 /**
  * Inbox: search + All / OTP / Important filters + shown notifications.
@@ -50,6 +56,10 @@ class InboxFragment : Fragment(), Refreshable {
             (activity as? MainActivity)?.updateStatus()
             Toast.makeText(requireContext(), "Filtering on", Toast.LENGTH_SHORT).show()
             refresh()
+        }
+
+        view.findViewById<MaterialButton>(R.id.listener_settings_button).setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
 
         adapter = NotificationAdapter(
@@ -103,6 +113,7 @@ class InboxFragment : Fragment(), Refreshable {
 
     override fun refresh() {
         if (!::db.isInitialized || !::adapter.isInitialized) return
+        updateStatusRow()
         pausedBanner.visibility = if (prefs.paused) View.VISIBLE else View.GONE
         var items: List<Record> = db.listByStatus("SHOWN")
         items = when (filter) {
@@ -121,5 +132,60 @@ class InboxFragment : Fragment(), Refreshable {
         adapter.update(items)
         emptyView.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
         (activity as? MainActivity)?.updateBadges()
+    }
+
+    /** Listener + AI status row, at the top of the Inbox. Tells Rani at a
+     *  glance whether notifications are reaching the app ("Listener: not
+     *  granted" = the toggle is off) and whether AI has a key. */
+    private fun updateStatusRow() {
+        val view = view ?: return
+        val context = requireContext()
+        val granted = NotificationManagerCompat.getEnabledListenerPackages(context)
+            .contains(context.packageName)
+        val connected = FilterService.isConnected()
+        val dot = view.findViewById<View>(R.id.listener_dot)
+        val statusText = view.findViewById<TextView>(R.id.listener_status)
+        val settingsButton = view.findViewById<MaterialButton>(R.id.listener_settings_button)
+        val aiText = view.findViewById<TextView>(R.id.ai_status)
+
+        val lastSeen = prefs.lastNotificationSeen
+        val lastSeenText = if (lastSeen > 0) {
+            " · last notification ${DateFormat.getTimeFormat(context).format(Date(lastSeen))}"
+        } else {
+            " · no notification yet"
+        }
+        when {
+            connected -> {
+                dot.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(context, R.color.md_ok)
+                )
+                statusText.text = "Listener: connected$lastSeenText"
+                settingsButton.visibility = View.GONE
+            }
+            granted -> {
+                dot.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(context, R.color.md_error)
+                )
+                statusText.text = "Listener: granted — waiting to connect$lastSeenText"
+                settingsButton.visibility = View.GONE
+            }
+            else -> {
+                dot.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(context, R.color.md_error)
+                )
+                statusText.text = "Listener: not granted — open Settings"
+                settingsButton.visibility = View.VISIBLE
+            }
+        }
+
+        val hasOpenRouter = prefs.openRouterKey.isNotBlank()
+        val hasGoogle = prefs.googleKey.isNotBlank()
+        aiText.text = when {
+            !hasOpenRouter && !hasGoogle -> "AI: no key added"
+            prefs.aiProvider == "google" && hasGoogle -> "AI: Gemini key added"
+            prefs.aiProvider == "google" && hasOpenRouter -> "AI: OpenRouter key added — not the active provider"
+            prefs.aiProvider == "openrouter" && hasOpenRouter -> "AI: OpenRouter key added"
+            else -> "AI: Gemini key added — not the active provider"
+        }
     }
 }

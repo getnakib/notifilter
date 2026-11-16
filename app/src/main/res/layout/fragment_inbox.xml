@@ -7,6 +7,67 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <!-- Listener + AI status — so it is obvious at a glance whether
+         notifications are reaching the app and whether AI has a key. -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/status_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp"
+        app:cardBackgroundColor="@color/md_surface"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="1dp"
+        app:strokeColor="@color/md_outline"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:id="@+id/listener_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:background="@drawable/dot"
+                    android:backgroundTint="@color/md_ok" />
+
+                <TextView
+                    android:id="@+id/listener_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:textColor="@color/md_on_surface"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/listener_settings_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/open_settings"
+                    android:visibility="gone"
+                    style="@style/Widget.Material3.Button.TextButton" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/ai_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/md_on_variant"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
     <!-- Paused banner (preview: error-container, shown only when paused). -->
     <LinearLayout
         android:id="@+id/paused_banner"
